@@ -1,0 +1,106 @@
+
+
+using FluentValidation;
+using Moq;
+using Supplier.Application.Dtos;
+using Supplier.Application.Interfaces;
+using Supplier.Domain;
+using Supplier.Domain.Entities;
+using Supplier.Infrastructure.Adapters.Implementations;
+using Supplier.Infrastructure.Adapters.Interfaces;
+using Supplier.Infrastructure.Interfaces;
+using Supplier.Infrastructure.Services;
+using USBService;
+
+namespace TestProject
+{
+    [TestFixture]
+    public class SearchServiceTests
+    {
+        private Mock<ISaleEngineServiceClient> _saleEngineServiceClientMock;
+        private Mock<ILoggerService> _loggerServiceMock;
+        private Mock<IValidator<SearchRequestDto>> _validatorMock;
+        private Mock<ISearchRequestAdapter> _searchRequestAdapterMock;
+        private Mock<ISearchResponseAdapter> _searchResponseAdapterMock;
+        private Mock<IErrorHandler> _errorHandlerMock;
+        private Mock<SaleEngineServiceClient> _saleEngineServiceClientInstanceMock;
+        private SearchService _searchService;
+
+        [SetUp]
+        public void SetUp()
+        {
+            _saleEngineServiceClientMock = new Mock<ISaleEngineServiceClient>();
+            _loggerServiceMock = new Mock<ILoggerService>();
+            _validatorMock = new Mock<IValidator<SearchRequestDto>>();
+            _searchRequestAdapterMock = new Mock<ISearchRequestAdapter>();
+            _searchResponseAdapterMock = new Mock<ISearchResponseAdapter>();
+            _errorHandlerMock = new Mock<IErrorHandler>();
+            _saleEngineServiceClientInstanceMock = new Mock<SaleEngineServiceClient>();
+
+            _searchService = new SearchService(
+                _saleEngineServiceClientMock.Object,
+                _loggerServiceMock.Object,
+                _validatorMock.Object,
+                _searchRequestAdapterMock.Object,
+                _searchResponseAdapterMock.Object,
+                _errorHandlerMock.Object
+            );
+        }
+
+        [Test]
+        public async Task Search_ShouldReturnApiResult_WhenRequestIsValid()
+        {
+            // Arrange
+            var searchRequestDto = new SearchRequestDto
+            {
+                UniqueTransID = "HASUSB30000006",
+                Routes = new List<Route>
+        {
+            new Route("DAC", "CXB", new DateTime(2024, 10, 2))
+        },
+                Adults = 2,
+                Childs = 2,
+                Infants = 1,
+                CabinClass = "Economy",
+                PreferredCarriers = new string[] { },
+                PermittedBookingCodes = new string[] { },
+                ProhibitedCarriers = new string[] { },
+                ChildrenAges = new int[] { 3, 7 },
+                IsOpenCombination = false,
+                ApiCredential = new ApiCredential
+                {
+                    UserName = "",
+                    Password = "_JEAAAAIP_Rh4IzvGO6D9DxdE4Wj3N6IO8w3mM3KhHcIy2WAEaAlJtOWTfpHHX9ciU4zQTfdg_U_U",
+                    TargetBranch = "",
+                    ServiceUrl = "",
+                    Url = "",
+                    PCC = "",
+                    BillingId = null,
+                    BillingPassword = null,
+                    ApiShortCode = "1G",
+                    IsLive = false
+                },
+
+            };
+
+            var validationResult = new FluentValidation.Results.ValidationResult();
+            _validatorMock.Setup(v => v.Validate(It.IsAny<SearchRequestDto>())).Returns(validationResult);
+
+            var apiResult = new ApiResult<IEnumerable<SearchResponseDto>>
+            {
+                StatusCode = 200,
+                Data = new List<SearchResponseDto>()
+            };
+
+            _searchRequestAdapterMock.Setup(a => a.ConvertCommonSearchRequestToSupplierSearchRequest(It.IsAny<SearchRequestDto>())).Returns(new SearchFlightsRequest());
+            _searchResponseAdapterMock.Setup(a => a.ConvertSupplierSearchResponseToCommonSearchResponse(It.IsAny<SearchFlightsResponse1>(), It.IsAny<SearchRequestDto>(), It.IsAny<string>())).ReturnsAsync(new List<SearchResponseDto>());
+
+            // Act
+            var result = await _searchService.Search(searchRequestDto);
+
+            // Assert
+            Assert.AreEqual(200, result.StatusCode);
+            Assert.IsInstanceOf<IEnumerable<SearchResponseDto>>(result.Data);
+        }
+    }
+}
